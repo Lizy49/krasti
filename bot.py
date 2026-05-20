@@ -1,97 +1,66 @@
 import asyncio
 import json
 import logging
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, ReplyKeyboardRemove
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
-# ===== НАСТРОЙКИ (замените на свои) =====
-BOT_TOKEN = "8910571579:AAFF6-8yx0J75TxLFfRVK_0fCkn3R47ilRk"
-MANAGER_ID = 7881608441 # Telegram ID менеджера
-WEBAPP_URL = "http://a914851f.beget.tech/"  # Ссылка на ваш магазин (WebApp)
-# =========================================
+# === НАСТРОЙКИ (будут из переменных окружения) ===
+BOT_TOKEN = os.getenv("8910571579:AAFF6-8yx0J75TxLFfRVK_0fCkn3R47ilRk")
+MANAGER_ID = int(os.getenv("MANAGER_ID", "7881608441"))
+WEBAPP_URL = os.getenv("WEBAPP_URL", "http://a914851f.beget.tech/")
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Состояния FSM: ожидаем комментарий после заказа
 class OrderState(StatesGroup):
     waiting_for_comment = State()
 
-# Клавиатура с кнопкой открытия магазина
 def get_main_keyboard():
-    button = KeyboardButton(
-        text="🛍 Открыть магазин",
-        web_app=WebAppInfo(url=WEBAPP_URL)
-    )
-    keyboard = ReplyKeyboardMarkup(keyboard=[[button]], resize_keyboard=True)
-    return keyboard
+    button = KeyboardButton(text="🛍 Открыть магазин", web_app=WebAppInfo(url=WEBAPP_URL))
+    return ReplyKeyboardMarkup(keyboard=[[button]], resize_keyboard=True)
 
-# Команда /start
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
-    # Сбрасываем состояние (на всякий случай)
     await state.clear()
-    await message.answer(
-        "👋 Добро пожаловать в KRASTI SHOP!\n\n"
-        "Нажмите кнопку ниже, чтобы выбрать товары. После оформления заказа напишите ваш адрес и пожелания.",
-        reply_markup=get_main_keyboard()
-    )
+    await message.answer("👋 Добро пожаловать в KRASTI SHOP!\n\nНажмите кнопку ниже, чтобы выбрать товары. После заказа напишите адрес и пожелания.", reply_markup=get_main_keyboard())
 
-# Обработка данных из WebApp (заказ)
 @dp.message(lambda message: message.web_app_data is not None)
 async def handle_order(message: Message, state: FSMContext):
     try:
         data = json.loads(message.web_app_data.data)
         cart = data.get("cart", [])
         total = data.get("total", 0)
-
         if not cart:
-            await message.answer("❌ Корзина пуста. Выберите товары в магазине.")
+            await message.answer("❌ Корзина пуста.")
             return
-
-        # Сохраняем заказ в FSM
         await state.update_data(order_cart=cart, order_total=total)
         await state.set_state(OrderState.waiting_for_comment)
-
-        # Спрашиваем адрес и пожелания
-        await message.answer(
-            "✅ Заказ получен!\n\n"
-            "✍️ Пожалуйста, напишите одним сообщением:\n"
-            "- Ваш адрес доставки\n"
-            "- Пожелания к заказу (например, желаемый вкус, цвет, дополнительные опции)\n\n"
-            "Пример: г. Москва, ул. Ленина 10, кв 5. Персик со льдом, без накипи.\n\n"
-            "Отправьте текст, и я передам его менеджеру.",
-            reply_markup=ReplyKeyboardRemove()
-        )
+        await message.answer("✅ Заказ получен!\n\n✍️ Напишите одним сообщением:\n- Адрес доставки\n- Пожелания (вкус и т.п.)\n\nПример: г. Москва, ул. Ленина 10. Вкус: Голубая малина.", reply_markup=ReplyKeyboardRemove())
     except Exception as e:
-        logging.error(f"Ошибка при обработке заказа: {e}")
-        await message.answer("❌ Произошла ошибка. Попробуйте ещё раз.")
+        logging.error(f"Ошибка: {e}")
+        await message.answer("❌ Ошибка, попробуйте снова.")
 
-# Обработка комментария (адрес + пожелания) от пользователя
 @dp.message(StateFilter(OrderState.waiting_for_comment))
 async def get_comment(message: Message, state: FSMContext):
     comment = message.text.strip()
     if not comment:
-        await message.answer("Пожалуйста, напишите адрес и пожелания текстом.")
+        await message.answer("Напишите адрес и пожелания текстом.")
         return
-
-    # Получаем сохранённый заказ
     user_data = await state.get_data()
     cart = user_data.get("order_cart", [])
     total = user_data.get("order_total", 0)
-
     if not cart:
-        await message.answer("❌ Заказ не найден. Пожалуйста, оформите заказ заново через магазин.")
+        await message.answer("❌ Заказ не найден. Оформите заново через магазин.")
         await state.clear()
-        await message.answer("Нажмите кнопку 'Открыть магазин'", reply_markup=get_main_keyboard())
+        await message.answer("Открыть магазин", reply_markup=get_main_keyboard())
         return
-
-    # Формируем сообщение для менеджера
     order_lines = []
     for idx, item in enumerate(cart, 1):
         name = item.get("name", "Товар")
@@ -100,49 +69,36 @@ async def get_comment(message: Message, state: FSMContext):
         amount = price * qty
         order_lines.append(f"{idx}. {name}\n   {qty} шт × {price} ₽ = {amount} ₽")
     order_text = "\n".join(order_lines)
-
-    manager_message = (
-        f"🛒 **НОВЫЙ ЗАКАЗ (с комментарием)**\n\n"
-        f"📦 **Товары:**\n{order_text}\n\n"
-        f"💰 **Итого:** {total} ₽\n\n"
-        f"📝 **Комментарий покупателя:**\n{comment}\n\n"
-        f"👤 **Покупатель:** @{message.from_user.username or message.from_user.first_name} (id: {message.from_user.id})"
-    )
-
-    # Отправляем менеджеру
+    manager_message = (f"🛒 **НОВЫЙ ЗАКАЗ (с комментарием)**\n\n📦 **Товары:**\n{order_text}\n\n💰 **Итого:** {total} ₽\n\n📝 **Комментарий:**\n{comment}\n\n👤 **Покупатель:** @{message.from_user.username or message.from_user.first_name} (id: {message.from_user.id})")
     try:
         await bot.send_message(chat_id=MANAGER_ID, text=manager_message, parse_mode="Markdown")
-        await message.answer(
-            "✅ Спасибо! Ваш заказ и комментарий переданы менеджеру.\n"
-            "Он свяжется с вами в ближайшее время.\n\n"
-            "Вы можете продолжить покупки, нажав кнопку 'Открыть магазин'.",
-            reply_markup=get_main_keyboard()
-        )
+        await message.answer("✅ Спасибо! Заказ передан менеджеру. Он свяжется с вами.\n\nМожете продолжить покупки.", reply_markup=get_main_keyboard())
     except Exception as e:
-        logging.error(f"Ошибка отправки менеджеру: {e}")
-        await message.answer("❌ Не удалось отправить заказ менеджеру. Попробуйте позже.")
-        await message.answer("Открыть магазин", reply_markup=get_main_keyboard())
-
-    # Завершаем состояние
+        logging.error(f"Ошибка отправки: {e}")
+        await message.answer("❌ Ошибка отправки заказа. Попробуйте позже.")
     await state.clear()
 
-# Если пользователь пишет что-то вне состояния (не заказ, не комментарий)
 @dp.message()
 async def unexpected_message(message: Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state == OrderState.waiting_for_comment:
-        # Уже обработано в get_comment, сюда не попадёт
-        pass
-    else:
-        await message.answer(
-            "Чтобы сделать заказ, нажмите кнопку 'Открыть магазин'.",
-            reply_markup=get_main_keyboard()
-        )
+    if await state.get_state() != OrderState.waiting_for_comment:
+        await message.answer("Чтобы сделать заказ, нажмите кнопку 'Открыть магазин'.", reply_markup=get_main_keyboard())
 
-# Запуск
-async def main():
-    print("Бот запущен и ожидает заказы...")
-    await dp.start_polling(bot)
+async def on_startup():
+    webhook_url = os.getenv("RENDER_EXTERNAL_URL")
+    if webhook_url:
+        await bot.set_webhook(f"{webhook_url}/webhook")
+        logging.info(f"Webhook set to {webhook_url}/webhook")
+    else:
+        logging.warning("No webhook URL, starting polling")
+        asyncio.create_task(dp.start_polling(bot))
+
+def main():
+    app = web.Application()
+    webhook_requests_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
+    webhook_requests_handler.register(app, path="/webhook")
+    setup_application(app, dp, bot=bot)
+    port = int(os.environ.get("PORT", 8080))
+    web.run_app(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
