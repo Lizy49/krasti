@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KRASTI SHOP</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Шапка -->
+        <header class="main-header">
+            <button class="header-btn theme-btn" onclick="toggleTheme()">
+                <span id="theme-icon" class="material-icons">light_mode</span>
+            </button>
+            <h1>KRASTI SHOP</h1>
+            <button class="header-btn cart-btn" onclick="openCart()">
+                <span class="material-icons">shopping_cart</span>
+                <span id="cart-count" class="cart-badge">0</span>
+            </button>
+        </header>
+        <div class="divider"></div>
+
+        <!-- Главный экран (Категории) -->
+        <div id="home-screen" class="screen active">
+            <div class="grid-menu">
+                <div class="card" onclick="openCategory('odnorazki')">
+                    <div class="card-img" style="background-image: url('/images/odno/prew_odno.jpg');"></div>
+                    <div class="card-info"><h3>Одноразки</h3></div>
+                </div>
+                <div class="card" onclick="openCategory('zhidkosti')">
+                    <div class="card-img" style="background-image: url('/images/shid/prew_shid.jpg');"></div>
+                    <div class="card-info"><h3>Жидкости</h3></div>
+                </div>
+                <div class="card" onclick="openCategory('rasxodniki')">
+                    <div class="card-img" style="background-image: url('/images/isp/prew_isp.jpg');"></div>
+                    <div class="card-info"><h3>Расходники</h3></div>
+                </div>
+                <div class="card" onclick="openCategory('plastinki')">
+                    <div class="card-img" style="background-image: url('/images/loop/prew_loop.jpg');"></div>
+                    <div class="card-info"><h3>Пластинки</h3></div>
+                </div>
+                <div class="card" onclick="openCategory('snyus')">
+                    <div class="card-img"></div>
+                    <div class="card-info"><h3>Снюс</h3></div>
+                </div>
+                <div class="card" onclick="openCategory('podsistemy')">
+                    <div class="card-img"></div>
+                    <div class="card-info"><h3>Под-системы</h3></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран каталога (Список товаров) -->
+        <div id="catalog-screen" class="screen">
+            <div class="catalog-header">
+                <button class="back-btn" onclick="goHome()"><span class="material-icons">arrow_back</span></button>
+                <h2 id="catalog-title">Каталог</h2>
+            </div>
+            <!-- Контейнер, куда JS добавит товары -->
+            <div id="products-container" class="products-list"></div>
+        </div>
+
+        <!-- Экран товара (Детали) -->
+        <div id="product-detail-screen" class="screen">
+            <div class="catalog-header">
+                <button class="back-btn" onclick="closeProductDetail()"><span class="material-icons">arrow_back</span></button>
+                <h2>О товаре</h2>
+            </div>
+            <div class="detail-content">
+                <div id="detail-img" class="detail-img"></div>
+                <h2 id="detail-name" class="detail-name"></h2>
+                <div id="detail-price" class="detail-price"></div>
+                <div class="info-block">
+                    <label id="flavor-label">Наличие вкусов:</label>
+                    <div class="flavor-text" id="detail-flavors">...</div>
+                </div>
+                <div class="info-block">
+                    <label id="strength-label">Крепкость:</label>
+                 <div class="strength-text" id="detail-strength">...</div>
+                </div>
+                <button class="add-btn-large" onclick="addToCartFromDetail()">
+                    <span class="material-icons">add_shopping_cart</span> Добавить в корзину
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран корзины -->
+        <div id="cart-screen" class="screen">
+            <div class="catalog-header">
+                <button class="back-btn" onclick="goHome()"><span class="material-icons">arrow_back</span></button>
+                <h2>Корзина</h2>
+            </div>
+            <div id="cart-items-container" class="cart-items"></div>
+        </div>
+        
+        <div id="cart-footer" class="cart-footer">
+            <div class="total-row">
+                <span>Итого:</span>
+                <span id="total-price">0 ₽</span>
+            </div>
+            <button class="checkout-btn" onclick="sendOrder()">Оформить заказ</button>
+        </div>
+
+        <!-- Экран "Пусто" (Нет товаров в категории) -->
+        <div id="empty-screen" class="screen">
+            <div class="catalog-header">
+                <button class="back-btn" onclick="goHome()"><span class="material-icons">arrow_back</span></button>
+                <h2 id="empty-title">Категория</h2>
+            </div>
+            <div class="empty-state-content">
+                <span class="material-icons empty-icon">inventory_2_off</span>
+                <p>Нет в наличии</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
