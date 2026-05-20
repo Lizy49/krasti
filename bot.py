@@ -8,9 +8,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, ReplyKeyboardRemove
 
 # ========= ВАШИ ДАННЫЕ =========
-BOT_TOKEN = "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-MANAGER_ID = 123456789
-WEBAPP_URL = "https://Lizy49.github.io/krasti/"
+BOT_TOKEN = "8910571579:AAFF6-8yx0J75TxLFfRVK_0fCkn3R47ilRk"
+MANAGER_ID = 7881608441 # Telegram ID менеджера
+WEBAPP_URL = "http://a914851f.beget.tech/"  # Ссылка на ваш магазин (WebApp)
 # =================================
 
 logging.basicConfig(level=logging.INFO)
